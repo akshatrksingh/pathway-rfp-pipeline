@@ -102,13 +102,46 @@ export default function MenuUpload({
   }
 
   const isPdf    = file?.type === 'application/pdf' || file?.name?.endsWith('.pdf')
-  const isReady  = file && (selectedRestaurant || restForm.name.trim()) && !isParsing
+  const needsState = !selectedRestaurant && !restForm.state.trim()
+  const isReady  = file && (selectedRestaurant || (restForm.name.trim() && restForm.state.trim())) && !isParsing
   const anyError = fileError || parseError
 
   return (
-    <div style={{ display: 'flex', gap: 48, alignItems: 'flex-start' }}>
+    <div style={{ position: 'relative', minHeight: 480 }}>
+      {/* ── Right: hero illustration — full-height background accent ── */}
+      {!isParsing && (
+        <div style={{
+          position: 'absolute',
+          top: -32,
+          right: -36,
+          bottom: -32,
+          width: '52%',
+          pointerEvents: 'none',
+          userSelect: 'none',
+          overflow: 'hidden',
+        }}>
+          <picture>
+            <source srcSet={heroIllustrationAvif} type="image/avif" />
+            <img
+              src={heroIllustrationJpg}
+              alt=""
+              draggable={false}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'left center',
+                display: 'block',
+                opacity: 0.18,
+                borderRadius: 'var(--radius-lg)',
+              }}
+            />
+          </picture>
+        </div>
+      )}
+
       {/* ── Left: form content ── */}
-      <div style={{ flex: '1 1 0', minWidth: 0, maxWidth: 520 }}>
+      <div style={{ position: 'relative', maxWidth: 520 }}>
         <h1 style={{
           fontFamily: 'var(--font-serif)',
           fontSize: 22,
@@ -155,12 +188,17 @@ export default function MenuUpload({
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>State</label>
+                  <label style={{ ...labelStyle, color: needsState && file ? 'var(--amber-text)' : 'var(--text-muted)' }}>
+                    State{needsState && file ? ' *' : ''}
+                  </label>
                   <FocusInput
                     placeholder="NY"
                     value={restForm.state}
-                    onChange={e => setRestForm(p => ({ ...p, state: e.target.value }))}
-                    style={{ textTransform: 'uppercase' }}
+                    onChange={e => setRestForm(p => ({ ...p, state: e.target.value.toUpperCase() }))}
+                    style={{
+                      textTransform: 'uppercase',
+                      ...(needsState && file ? { borderColor: 'var(--amber-strong)' } : {}),
+                    }}
                   />
                 </div>
               </div>
@@ -246,6 +284,11 @@ export default function MenuUpload({
             </div>
           )}
 
+          {needsState && file && (
+            <p style={{ fontSize: 12, color: 'var(--amber-text)', marginBottom: 12 }}>
+              Enter a state to enable distributor search and email personalization.
+            </p>
+          )}
           <button
             type="submit"
             disabled={!isReady}
@@ -274,34 +317,6 @@ export default function MenuUpload({
           </button>
         </form>
       </div>
-
-      {/* ── Right: hero illustration — hidden while parsing ── */}
-      {!isParsing && (
-        <div style={{
-          flexShrink: 0,
-          width: 340,
-          paddingTop: 8,
-          // fade in
-          opacity: 1,
-          transition: 'opacity 0.2s',
-        }}>
-          <picture>
-            <source srcSet={heroIllustrationAvif} type="image/avif" />
-            <img
-              src={heroIllustrationJpg}
-              alt=""
-              draggable={false}
-              style={{
-                width: '100%',
-                height: 'auto',
-                display: 'block',
-                borderRadius: 'var(--radius-lg)',
-                userSelect: 'none',
-              }}
-            />
-          </picture>
-        </div>
-      )}
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>

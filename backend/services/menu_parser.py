@@ -8,6 +8,7 @@ Dispatch:
 """
 
 import io
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pdfplumber
 
 from schemas import ParsedMenu
@@ -72,7 +73,7 @@ def _extract_pdf_text(pdf_bytes: bytes) -> str:
     return "\n".join(parts)
 
 
-def _render_pdf_pages(pdf_bytes: bytes, max_pages: int = 4, resolution: int = 100) -> list[bytes]:
+def _render_pdf_pages(pdf_bytes: bytes, max_pages: int = 4, resolution: int = 72) -> list[bytes]:
     """Render PDF pages as PNG bytes for vision parsing."""
     images = []
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
@@ -103,14 +104,29 @@ def parse_menu(*, file_bytes: bytes, content_type: str) -> ParsedMenu:
         text = _extract_pdf_text(file_bytes)
 
         if not text.strip():
-            # Scanned / image-based PDF — render pages and use vision
+            # Scanned / image-based PDF — render pages and use vision in parallel
             page_images = _render_pdf_pages(file_bytes)
             if not page_images:
                 raise ValueError("Could not extract content from this PDF.")
+
             all_dishes: list[dict] = []
-            for img_bytes in page_images:
-                result = _vision_parse(img_bytes, "image/png", client)
-                all_dishes.extend(result.get("dishes", []))
+            # Parse pages concurrently — each call is independent
+            with ThreadPoolExecutor(max_workers=len(page_images)) as pool:
+                futures = {
+                    pool.submit(_vision_parse, img_bytes, "image/png", LLMClient()): i
+                    for i, img_bytes in enumerate(page_images)
+                }
+                # Collect results in page order
+                ordered: dict[int, list] = {}
+                for future in as_completed(futures):
+                    idx = futures[future]
+                    try:
+                        result = future.result()
+                        ordered[idx] = result.get("dishes", [])
+                    except Exception:
+                        ordered[idx] = []
+            for i in sorted(ordered):
+                all_dishes.extend(ordered[i])
             return ParsedMenu.model_validate({"dishes": all_dishes})
 
         # Text-based PDF

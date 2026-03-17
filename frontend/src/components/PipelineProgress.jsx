@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import EmailReview from './EmailReview'
 
 // ---------------------------------------------------------------------------
@@ -340,8 +340,11 @@ export default function PipelineProgress({ runId }) {
   const [sendResults, setSendResults] = useState(null)
   const [errors, setErrors] = useState({})
   const [expanded, setExpanded] = useState({ pricing: true, distributors: true })
+  const hasStarted = useRef(false)
 
   useEffect(() => {
+    if (hasStarted.current) return
+    hasStarted.current = true
     runPipeline()
   }, [runId])
 
@@ -381,7 +384,7 @@ export default function PipelineProgress({ runId }) {
         included: true,
         editBody: e.body,
         editSubject: e.subject,
-        isExpanded: false,
+        isExpanded: true,
         editInstruction: '',
         isRevising: false,
       })))

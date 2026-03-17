@@ -42,6 +42,10 @@ def compose_rfp_email(
 
     specialty_note = f" (specialty: {distributor_specialty})" if distributor_specialty else ""
 
+    location = f"{restaurant_city}, {restaurant_state}".strip(", ")
+    if not location:
+        location = "the US"
+
     messages = [
         {
             "role": "system",
@@ -51,6 +55,7 @@ def compose_rfp_email(
                 "to a wholesale food distributor. "
                 "Tone: professional but friendly. Length: 150–250 words. "
                 "Do NOT fabricate prices, minimum orders, or contract terms. "
+                f"Sign off with '{restaurant_name} Procurement Team' — never use placeholder text like [Your Name]. "
                 "Return ONLY valid JSON with keys 'subject' and 'body'. "
                 "The body should be plain text (no markdown, no bullet symbols other than dashes)."
             ),
@@ -58,13 +63,13 @@ def compose_rfp_email(
         {
             "role": "user",
             "content": (
-                f"Restaurant: {restaurant_name}, located in {restaurant_city}, {restaurant_state}\n"
+                f"Restaurant: {restaurant_name}, located in {location}\n"
                 f"Distributor: {distributor_name}{specialty_note}\n"
                 f"Quote deadline: {deadline}\n\n"
                 f"Ingredients needed (monthly quantities):\n{ing_block}\n\n"
                 "Draft the RFP email. The subject should be specific and professional. "
                 "The body should introduce the restaurant, request pricing for the listed "
-                "ingredients, mention the quote deadline, and provide a clear call to action."
+                f"ingredients, mention the quote deadline, and sign off as '{restaurant_name} Procurement Team'."
             ),
         },
     ]
@@ -95,10 +100,12 @@ def _fallback_body(
     ingredients: list[dict],
     deadline: str,
 ) -> str:
+    location_str = f"{city}, {state}".strip(", ")
+    location_clause = f" ({location_str})" if location_str else ""
     lines = [
         f"Dear {distributor_name} Team,",
         "",
-        f"We are writing on behalf of {restaurant_name} ({city}, {state}) to request "
+        f"We are writing on behalf of {restaurant_name}{location_clause} to request "
         f"wholesale pricing for the following ingredients:",
         "",
     ]

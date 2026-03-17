@@ -308,12 +308,7 @@ def price_ingredient(
       - Updates ingredient.usda_fdc_id / usda_category if USDA returns a match.
       - Writes a new PriceData row (unless returning cached).
     """
-    # 1. Cache hit
-    cached = _get_cached(db, ingredient.id)
-    if cached:
-        return cached, "cached"
-
-    # 2. USDA enrichment (non-fatal — provides category context for LLM)
+    # 1. USDA enrichment (non-fatal — provides category context for LLM)
     usda = search_ingredient(ingredient.name)
     if usda:
         ingredient.usda_fdc_id   = usda["fdc_id"]
