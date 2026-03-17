@@ -11,3 +11,4 @@ pathway-rfp-pipeline-venv/
 *.db-wal
 docs/
 *.pdf
+.DS_Store
