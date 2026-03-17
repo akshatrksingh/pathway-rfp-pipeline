@@ -6,9 +6,9 @@ Automated RFP pipeline for restaurant ingredient procurement.
 
 ## Demo
 
-See the [Loom walkthrough]([LOOM_LINK_HERE](https://www.loom.com/share/3380706f4e66415daadb61a2d2ff6a6c)).
+See the [Loom walkthrough](https://www.loom.com/share/3380706f4e66415daadb61a2d2ff6a6c).
 
-Menu source: [restaurant name]([URL](https://www.loom.com/share/3380706f4e66415daadb61a2d2ff6a6c))
+Menu source: [Bombay Bites (dummy restaurant name, real menu)](https://www.loom.com/share/3380706f4e66415daadb61a2d2ff6a6c)
 
 ---
 
