@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import ConfirmModal from './ConfirmModal'
+
 // Edit status → visual treatment
 const STATUS_STYLES = {
   unchanged: {
@@ -105,7 +108,7 @@ function IngredientRow({ ing, onUpdate, onDelete, onUndo }) {
   )
 }
 
-function DishCard({ dish, onToggle, onUpdateIngredient, onDeleteIngredient, onUndoDelete, onAddIngredient }) {
+function DishCard({ dish, onToggle, onUpdateIngredient, onDeleteIngredient, onUndoDelete, onAddIngredient, onDeleteDish }) {
   const activeCount = dish.ingredients.filter(i => i.editStatus !== 'deleted').length
   const hasEdits = dish.ingredients.some(i => i.editStatus !== 'unchanged')
 
@@ -173,6 +176,20 @@ function DishCard({ dish, onToggle, onUpdateIngredient, onDeleteIngredient, onUn
           <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>
             {activeCount} ingredient{activeCount !== 1 ? 's' : ''}
           </span>
+          {/* Delete dish */}
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onDeleteDish() }}
+            title="Remove dish"
+            style={{
+              background: 'none', border: 'none', padding: '2px 4px',
+              cursor: 'pointer', color: 'var(--text-hint)',
+              fontSize: 16, lineHeight: 1,
+              display: 'flex', alignItems: 'center',
+            }}
+          >
+            ×
+          </button>
           {/* Chevron */}
           <svg
             width="12" height="12" viewBox="0 0 12 12" fill="none"
@@ -243,6 +260,9 @@ function DishCard({ dish, onToggle, onUpdateIngredient, onDeleteIngredient, onUn
 }
 
 export default function IngredientReview({ dishes, setDishes, onConfirm, isConfirming = false, confirmError = null }) {
+  const [confirmPipeline, setConfirmPipeline] = useState(false)
+  const [deleteDishId, setDeleteDishId]       = useState(null)
+
   function toggleDish(dishId) {
     setDishes(prev => prev.map(d =>
       d.id === dishId ? { ...d, isExpanded: !d.isExpanded } : d
@@ -286,6 +306,11 @@ export default function IngredientReview({ dishes, setDishes, onConfirm, isConfi
         }),
       }
     }))
+  }
+
+  function deleteDish(dishId) {
+    setDishes(prev => prev.filter(d => d.id !== dishId))
+    setDeleteDishId(null)
   }
 
   function addIngredient(dishId) {
@@ -345,7 +370,7 @@ export default function IngredientReview({ dishes, setDishes, onConfirm, isConfi
         </div>
 
         <button
-          onClick={onConfirm}
+          onClick={() => setConfirmPipeline(true)}
           disabled={isConfirming}
           style={{
             background: isConfirming ? 'var(--text-hint)' : 'var(--green-strong)',
@@ -390,8 +415,32 @@ export default function IngredientReview({ dishes, setDishes, onConfirm, isConfi
           onDeleteIngredient={(ingId) => deleteIngredient(dish.id, ingId)}
           onUndoDelete={(ingId) => undoDelete(dish.id, ingId)}
           onAddIngredient={() => addIngredient(dish.id)}
+          onDeleteDish={() => setDeleteDishId(dish.id)}
         />
       ))}
+
+      {/* Confirm pipeline modal */}
+      {confirmPipeline && (
+        <ConfirmModal
+          title="Run pipeline"
+          message={`This will price ${activeCount} ingredients, find distributors, and draft RFP emails. This can't be undone.`}
+          confirmLabel="Confirm & run"
+          onConfirm={() => { setConfirmPipeline(false); onConfirm() }}
+          onCancel={() => setConfirmPipeline(false)}
+        />
+      )}
+
+      {/* Delete dish modal */}
+      {deleteDishId && (
+        <ConfirmModal
+          title="Remove dish"
+          message={`Remove "${dishes.find(d => d.id === deleteDishId)?.name}" and all its ingredients?`}
+          confirmLabel="Remove dish"
+          danger
+          onConfirm={() => deleteDish(deleteDishId)}
+          onCancel={() => setDeleteDishId(null)}
+        />
+      )}
 
       {/* Confirm error */}
       {confirmError && (
@@ -411,7 +460,7 @@ export default function IngredientReview({ dishes, setDishes, onConfirm, isConfi
       {/* Bottom CTA */}
       <div style={{ paddingTop: 4, paddingBottom: 32, display: 'flex', alignItems: 'center', gap: 14 }}>
         <button
-          onClick={onConfirm}
+          onClick={() => setConfirmPipeline(true)}
           disabled={isConfirming}
           style={{
             background: isConfirming ? 'var(--text-hint)' : 'var(--green-strong)',

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ConfirmModal from './ConfirmModal'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -340,6 +341,8 @@ export default function EmailReview({
     return <SendSummary sendResults={sendResults} emails={emails} />
   }
 
+  const [confirmSend, setConfirmSend] = useState(null)  // null | 'all' | 'selected'
+
   const includedEmails = emails.filter(e => e.included)
   const includedCount = includedEmails.length
   const totalCount = emails.length
@@ -372,12 +375,21 @@ export default function EmailReview({
   function handleSendSelected() {
     const ids = includedEmails.map(e => e.id)
     if (ids.length === 0) return
-    onSend(ids)
+    setConfirmSend('selected')
   }
 
   function handleSendAll() {
-    setEmails(prev => prev.map(e => ({ ...e, included: true })))
-    onSend(null)
+    setConfirmSend('all')
+  }
+
+  function doSend() {
+    if (confirmSend === 'all') {
+      setEmails(prev => prev.map(e => ({ ...e, included: true })))
+      onSend(null)
+    } else {
+      onSend(includedEmails.map(e => e.id))
+    }
+    setConfirmSend(null)
   }
 
   return (
@@ -479,6 +491,21 @@ export default function EmailReview({
           onRevise={handleRevise}
         />
       ))}
+
+      {/* Send confirmation modal */}
+      {confirmSend && (
+        <ConfirmModal
+          title={confirmSend === 'all' ? 'Send all emails' : `Send ${includedCount} email${includedCount !== 1 ? 's' : ''}`}
+          message={
+            confirmSend === 'all'
+              ? `This will send RFP emails to all ${totalCount} distributors. This can't be undone.`
+              : `This will send RFP emails to ${includedCount} selected distributor${includedCount !== 1 ? 's' : ''}. This can't be undone.`
+          }
+          confirmLabel="Send"
+          onConfirm={doSend}
+          onCancel={() => setConfirmSend(null)}
+        />
+      )}
 
       {/* Bottom send bar */}
       <div style={{ paddingTop: 8, paddingBottom: 32, display: 'flex', alignItems: 'center', gap: 12 }}>

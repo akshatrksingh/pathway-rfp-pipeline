@@ -4,6 +4,13 @@ const ACCEPTED_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg', 'i
 const ACCEPTED_EXTS  = new Set(['.pdf', '.png', '.jpg', '.jpeg', '.webp'])
 const MAX_BYTES      = 30 * 1024 * 1024  // 30 MB
 
+const US_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DC','DE','FL','GA','HI','ID','IL','IN',
+  'IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH',
+  'NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT',
+  'VT','VA','WA','WV','WI','WY',
+]
+
 const labelStyle = {
   display: 'block',
   fontSize: 12,
@@ -57,7 +64,6 @@ function FileIcon({ isPdf }) {
 function validateFile(file) {
   const ext = '.' + (file.name || '').split('.').pop().toLowerCase()
   const type = (file.type || '').toLowerCase()
-
   if (!ACCEPTED_TYPES.has(type) && !ACCEPTED_EXTS.has(ext)) {
     return 'Please upload a PDF or image file (PNG, JPG, JPEG).'
   }
@@ -67,22 +73,23 @@ function validateFile(file) {
   return null
 }
 
+function cityValid(city) {
+  return city.trim().length > 0 && /^[a-zA-Z\s\-'.]+$/.test(city.trim())
+}
+
 export default function MenuUpload({
   restForm, setRestForm, selectedRestaurant, isParsing, parseError, onParse,
 }) {
   const [file, setFile]             = useState(null)
   const [fileError, setFileError]   = useState(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [touched, setTouched]       = useState({ name: false, city: false })
   const inputRef = useRef(null)
 
   function handleFile(f) {
     if (!f) return
     const err = validateFile(f)
-    if (err) {
-      setFileError(err)
-      setFile(null)
-      return
-    }
+    if (err) { setFileError(err); setFile(null); return }
     setFileError(null)
     setFile(f)
   }
@@ -99,15 +106,24 @@ export default function MenuUpload({
     onParse({ file })
   }
 
-  const isPdf    = file?.type === 'application/pdf' || file?.name?.endsWith('.pdf')
-  const needsState = !selectedRestaurant && !restForm.state.trim()
-  const isReady  = file && (selectedRestaurant || (restForm.name.trim() && restForm.state.trim())) && !isParsing
+  const isPdf = file?.type === 'application/pdf' || file?.name?.endsWith('.pdf')
+
+  // Validation (only when not using an existing restaurant)
+  const nameVal  = restForm.name.trim()
+  const nameOk   = nameVal.length >= 2
+  const cityOk   = cityValid(restForm.city)
+  const stateOk  = restForm.state !== ''
+
+  const showNameErr  = touched.name && !nameOk
+  const showCityErr  = touched.city && restForm.city.trim() && !cityOk
+
+  const isReady = file && (selectedRestaurant || (nameOk && cityOk && stateOk)) && !isParsing
   const anyError = fileError || parseError
 
   return (
     <div style={{ position: 'relative', minHeight: 480 }}>
 
-      {/* ── Left: form content ── */}
+      {/* ── Form content ── */}
       <div style={{ position: 'relative', maxWidth: 520 }}>
         <h1 style={{
           fontFamily: 'var(--font-serif)',
@@ -129,15 +145,25 @@ export default function MenuUpload({
           {/* Restaurant fields — new only */}
           {!selectedRestaurant && (
             <div style={{ marginBottom: 28 }}>
+              {/* Name */}
               <div style={{ marginBottom: 12 }}>
-                <label style={labelStyle}>Restaurant name</label>
+                <label style={labelStyle}>Restaurant name <span style={{ color: 'var(--red-text, #C0392B)' }}>*</span></label>
                 <FocusInput
-                  placeholder="e.g. Luca's Trattoria"
+                  placeholder="e.g. Spice Garden"
                   value={restForm.name}
                   onChange={e => setRestForm(p => ({ ...p, name: e.target.value }))}
+                  onBlur={() => setTouched(t => ({ ...t, name: true }))}
+                  style={showNameErr ? { borderColor: 'var(--red-strong, #C0392B)' } : {}}
                 />
+                {showNameErr && (
+                  <p style={{ fontSize: 11, color: 'var(--red-text, #C0392B)', marginTop: 4 }}>
+                    Name must be at least 2 characters.
+                  </p>
+                )}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 72px', gap: 10 }}>
+
+              {/* Address + City + State */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 90px', gap: 10 }}>
                 <div>
                   <label style={labelStyle}>Street address</label>
                   <FocusInput
@@ -147,26 +173,41 @@ export default function MenuUpload({
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>City</label>
+                  <label style={labelStyle}>City <span style={{ color: 'var(--red-text, #C0392B)' }}>*</span></label>
                   <FocusInput
-                    placeholder="Brooklyn"
+                    placeholder="Austin"
                     value={restForm.city}
                     onChange={e => setRestForm(p => ({ ...p, city: e.target.value }))}
+                    onBlur={() => setTouched(t => ({ ...t, city: true }))}
+                    style={showCityErr ? { borderColor: 'var(--red-strong, #C0392B)' } : {}}
                   />
+                  {showCityErr && (
+                    <p style={{ fontSize: 11, color: 'var(--red-text, #C0392B)', marginTop: 4 }}>
+                      Letters only.
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <label style={{ ...labelStyle, color: needsState && file ? 'var(--amber-text)' : 'var(--text-muted)' }}>
-                    State{needsState && file ? ' *' : ''}
-                  </label>
-                  <FocusInput
-                    placeholder="NY"
+                  <label style={labelStyle}>State <span style={{ color: 'var(--red-text, #C0392B)' }}>*</span></label>
+                  <select
                     value={restForm.state}
-                    onChange={e => setRestForm(p => ({ ...p, state: e.target.value.toUpperCase() }))}
+                    onChange={e => setRestForm(p => ({ ...p, state: e.target.value }))}
                     style={{
-                      textTransform: 'uppercase',
-                      ...(needsState && file ? { borderColor: 'var(--amber-strong)' } : {}),
+                      ...inputStyle,
+                      appearance: 'none',
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 10px center',
+                      paddingRight: 28,
+                      cursor: 'pointer',
+                      color: restForm.state ? 'var(--text-primary)' : 'var(--text-hint)',
                     }}
-                  />
+                  >
+                    <option value="">State</option>
+                    {US_STATES.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
@@ -251,11 +292,6 @@ export default function MenuUpload({
             </div>
           )}
 
-          {needsState && file && (
-            <p style={{ fontSize: 12, color: 'var(--amber-text)', marginBottom: 12 }}>
-              Enter a state to enable distributor search and email personalization.
-            </p>
-          )}
           <button
             type="submit"
             disabled={!isReady}

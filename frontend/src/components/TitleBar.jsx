@@ -16,7 +16,7 @@ export default function TitleBar({ restaurantName }) {
         color: 'var(--text-primary)',
         letterSpacing: '-0.1px',
       }}>
-        RFP Pipeline{restaurantName ? ` — ${restaurantName}` : ''}
+        Pantry{restaurantName ? ` — ${restaurantName}` : ''}
       </span>
     </div>
   )
