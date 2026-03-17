@@ -71,7 +71,7 @@ cd pathway-rfp-pipeline
 cd backend
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-pip install agentmail          # optional — needed only if AGENTMAIL_API_KEY is set
+pip install agentmail      
 
 cp ../.env.example ../.env
 # Fill in API keys in .env (see section below)
