@@ -163,7 +163,7 @@ docs/
 ## Design decisions
 
 - **Tavily over LLM-generated distributors** — the system finds real businesses via web search. Results can be verified by the user; no fake companies are ever stored or emailed.
-- **AgentMail over basic SMTP** — not just a sender. AgentMail gives the agent its own inbox. In production this enables autonomous quote monitoring: the agent watches for replies, parses quotes, and follows up on non-responses. It's agent-native infrastructure, not a one-shot mailer.
+- **AgentMail over basic SMTP** — not just a sender. AgentMail gives the agent its own inbox. In production this enables autonomous quote monitoring: the agent watches for replies, parses quotes, and follows up on non-responses. It's agent-native infrastructure, hence the nice-to-have feature can be easily implemented in the future.
 - **Batch LLM pricing** — all ingredients priced in a single API call. Avoids rate-limit exhaustion on large menus (a menu with 60+ ingredients would hit Groq limits with per-ingredient calls).
 - **Two human checkpoints** — AI handles data gathering (parsing, pricing, searching, drafting); humans handle judgment calls (are these the right ingredients? should this email go out?). The pipeline pauses and waits at both points.
 - **Swappable LLM provider** — change `LLM_PROVIDER` in `.env` to switch between Groq (free), Claude (highest quality), or OpenAI. The abstraction handles the different SDK formats transparently.
