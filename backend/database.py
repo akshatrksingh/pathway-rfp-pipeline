@@ -1,6 +1,7 @@
 from pathlib import Path
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.pool import NullPool, QueuePool
 
 from config import get_settings
 
@@ -22,9 +23,12 @@ _db_url = _resolve_db_url(settings.database_url)
 
 _is_sqlite = _db_url.startswith("sqlite")
 
+# NullPool: each request gets its own connection — no pool timeout during
+# long-running pricing requests. WAL mode handles concurrent reads.
 engine = create_engine(
     _db_url,
-    connect_args={"check_same_thread": False, "timeout": 30} if _is_sqlite else {},
+    connect_args={"check_same_thread": False, "timeout": 60} if _is_sqlite else {},
+    poolclass=NullPool if _is_sqlite else QueuePool,
 )
 
 if _is_sqlite:
@@ -32,6 +36,7 @@ if _is_sqlite:
     def _set_sqlite_pragmas(dbapi_conn, _):
         dbapi_conn.execute("PRAGMA journal_mode=WAL")
         dbapi_conn.execute("PRAGMA synchronous=NORMAL")
+        dbapi_conn.execute("PRAGMA busy_timeout=30000")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

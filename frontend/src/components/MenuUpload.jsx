@@ -1,6 +1,4 @@
 import { useState, useRef } from 'react'
-import heroIllustrationAvif from '../assets/hero-illustration.avif'
-import heroIllustrationJpg from '../assets/hero-illustration.jpg'
 
 const ACCEPTED_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'])
 const ACCEPTED_EXTS  = new Set(['.pdf', '.png', '.jpg', '.jpeg', '.webp'])
@@ -108,37 +106,6 @@ export default function MenuUpload({
 
   return (
     <div style={{ position: 'relative', minHeight: 480 }}>
-      {/* ── Right: hero illustration — full-height background accent ── */}
-      {!isParsing && (
-        <div style={{
-          position: 'absolute',
-          top: -32,
-          right: -36,
-          bottom: -32,
-          width: '52%',
-          pointerEvents: 'none',
-          userSelect: 'none',
-          overflow: 'hidden',
-        }}>
-          <picture>
-            <source srcSet={heroIllustrationAvif} type="image/avif" />
-            <img
-              src={heroIllustrationJpg}
-              alt=""
-              draggable={false}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                objectPosition: 'left center',
-                display: 'block',
-                opacity: 0.18,
-                borderRadius: 'var(--radius-lg)',
-              }}
-            />
-          </picture>
-        </div>
-      )}
 
       {/* ── Left: form content ── */}
       <div style={{ position: 'relative', maxWidth: 520 }}>

@@ -8,7 +8,10 @@ from schemas import (
     IngredientPriceResult, PricingResponse,
     DistributorOut, DistributorCoverage, DistributorGap, DistributorSearchResponse,
 )
-from services.pricing import price_ingredient
+from datetime import datetime, timedelta
+from services.pricing import _get_cached, _canonical_unit, _normalize_unit, _llm_estimate_batch, _LLM_TTL
+from services.usda_client import search_ingredient
+from models import PriceData
 from services.distributor_finder import find_distributors_for_run
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
@@ -114,9 +117,9 @@ def run_pricing(run_id: int, db: Session = Depends(get_db)):
     """
     Price every unique ingredient in a pipeline run.
 
-    For each ingredient:
-      - Returns cached price if TTL is valid.
-      - Otherwise: USDA FDC lookup (enriches ingredient) + LLM price estimate.
+    Pass 1: return cached prices immediately.
+    Pass 2: USDA-enrich all uncached ingredients (adds category context).
+    Pass 3: one batch LLM call for all uncached → single rate-limit slot.
     """
     run = db.query(PipelineRun).filter(PipelineRun.id == run_id).first()
     if not run:
@@ -126,46 +129,95 @@ def run_pricing(run_id: int, db: Session = Depends(get_db)):
     city  = restaurant.city  if restaurant else ""
     state = restaurant.state if restaurant else ""
 
-    # Collect unique ingredients (ingredient_id → representative unit)
     dish_ids = [
-        row.id
-        for row in db.query(Dish.id).filter(Dish.menu_id == run.menu_id).all()
+        row.id for row in db.query(Dish.id).filter(Dish.menu_id == run.menu_id).all()
     ]
     if not dish_ids:
         raise HTTPException(status_code=422, detail="No dishes found for this run.")
 
-    dis = (
-        db.query(DishIngredient)
-        .filter(DishIngredient.dish_id.in_(dish_ids))
-        .all()
-    )
-    # First occurrence of each ingredient gives us the unit
+    dis = db.query(DishIngredient).filter(DishIngredient.dish_id.in_(dish_ids)).all()
     seen: dict[int, str | None] = {}
     for di in dis:
         if di.ingredient_id not in seen:
             seen[di.ingredient_id] = di.unit
 
     results:      list[IngredientPriceResult] = []
-    llm_count    = 0
     cached_count = 0
-    api_count    = 0
+    uncached:     list[Ingredient] = []
 
-    for ing_id, unit in seen.items():
+    # Pass 1: serve cached, collect uncached
+    for ing_id in seen:
         ingredient = db.query(Ingredient).filter(Ingredient.id == ing_id).first()
         if not ingredient:
             continue
-
-        pd, origin = price_ingredient(db, ingredient, unit, city=city, state=state)
-
-        if origin == "cached":
+        cached = _get_cached(db, ingredient.id)
+        if cached:
             cached_count += 1
-        elif origin == "llm_estimate":
+            results.append(IngredientPriceResult(
+                ingredient_id=ingredient.id,
+                ingredient_name=ingredient.name,
+                fdc_id=ingredient.usda_fdc_id,
+                usda_category=ingredient.usda_category,
+                price_low=cached.price_low,
+                price_avg=cached.price_avg,
+                price_high=cached.price_high,
+                unit=cached.unit,
+                source=cached.source,
+                confidence=cached.confidence,
+            ))
+        else:
+            uncached.append(ingredient)
+
+    # Pass 2: USDA-enrich uncached (fast REST calls, adds category for LLM context)
+    for ingredient in uncached:
+        try:
+            usda = search_ingredient(ingredient.name)
+            if usda:
+                ingredient.usda_fdc_id   = usda["fdc_id"]
+                ingredient.usda_category = usda["category"]
+                db.flush()
+        except Exception:
+            pass
+
+    # Pass 3: one batch LLM call for all uncached ingredients
+    batch_items = [
+        {"name": ing.name,
+         "usda_category": ing.usda_category,
+         "unit": _canonical_unit(ing.name, ing.usda_category)}
+        for ing in uncached
+    ]
+    llm_prices = _llm_estimate_batch(batch_items, city, state)
+
+    llm_count = 0
+    for ingredient in uncached:
+        bulk_unit = _canonical_unit(ingredient.name, ingredient.usda_category)
+        est       = llm_prices.get(ingredient.name.lower().strip(), {})
+
+        if est.get("price_avg") is not None:
+            source     = "llm_estimate"
+            confidence = "low"
+            expires_at = datetime.utcnow() + _LLM_TTL
             llm_count += 1
         else:
-            api_count += 1  # tavily or any future real API
+            source     = "failed"
+            confidence = "none"
+            expires_at = datetime.utcnow() + timedelta(hours=1)
+
+        pd = PriceData(
+            ingredient_id=ingredient.id,
+            price_low=est.get("price_low"),
+            price_avg=est.get("price_avg"),
+            price_high=est.get("price_high"),
+            unit=_normalize_unit(est.get("unit") or bulk_unit),
+            source=source,
+            confidence=confidence,
+            expires_at=expires_at,
+        )
+        db.add(pd)
+        db.flush()
 
         results.append(IngredientPriceResult(
-            ingredient_id=ing_id,
+            ingredient_id=ingredient.id,
             ingredient_name=ingredient.name,
             fdc_id=ingredient.usda_fdc_id,
             usda_category=ingredient.usda_category,
@@ -184,7 +236,7 @@ def run_pricing(run_id: int, db: Session = Depends(get_db)):
         run_id=run_id,
         results=results,
         total=len(results),
-        api_count=api_count,
+        api_count=0,
         llm_count=llm_count,
         cached_count=cached_count,
     )

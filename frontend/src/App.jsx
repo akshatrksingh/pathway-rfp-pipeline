@@ -6,11 +6,6 @@ import DishServings from './components/DishServings'
 import IngredientReview from './components/IngredientReview'
 import PipelineProgress from './components/PipelineProgress'
 
-const MOCK_RESTAURANTS = [
-  { id: 1, name: "Luca's Trattoria", address: '123 Main St', city: 'Brooklyn', state: 'NY' },
-  { id: 2, name: "Joe's Pizza", address: '456 Park Ave', city: 'Manhattan', state: 'NY' },
-]
-
 function buildEditableDishes(dishesWithServings) {
   return dishesWithServings.map((dish, di) => ({
     id: `d${di}`,
@@ -41,7 +36,7 @@ function buildEditableDishes(dishesWithServings) {
 }
 
 export default function App() {
-  const [restaurants, setRestaurants] = useState(MOCK_RESTAURANTS)
+  const [restaurants, setRestaurants] = useState([])
   const [selectedRestId, setSelectedRestId] = useState(null)
 
   // 'upload' | 'servings' | 'review' | 'pipeline'
