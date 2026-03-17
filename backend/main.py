@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import Base, engine
-from routers import menus, pipeline
+from routers import menus, pipeline, emails
 
 # Create all tables on startup
 Base.metadata.create_all(engine)
@@ -19,3 +19,4 @@ app.add_middleware(
 
 app.include_router(menus.router)
 app.include_router(pipeline.router)
+app.include_router(emails.router)

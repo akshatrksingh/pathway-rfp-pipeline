@@ -10,6 +10,7 @@ Usage:
 """
 
 import json
+import re
 from config import get_settings
 
 settings = get_settings()
@@ -42,12 +43,31 @@ class LLMClient:
     def get_json_completion(self, messages: list[dict], temperature: float = 0.1) -> dict | list:
         """Like get_completion but parses the response as JSON."""
         raw = self.get_completion(messages, temperature)
-        # Strip markdown code fences if the model wrapped the JSON
+        raw = self._extract_json_text(raw)
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return json.loads(raw, strict=False)
+
+    @staticmethod
+    def _extract_json_text(raw: str) -> str:
+        """
+        Pull the JSON payload out of an LLM response that may include:
+        - preamble prose ("Here is the JSON: ...")
+        - markdown code fences (```json ... ```)
+        - trailing commentary
+        """
         raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[-1]
-            raw = raw.rsplit("```", 1)[0]
-        return json.loads(raw.strip())
+        # 1. Content inside any ``` block (with optional language tag)
+        fence = re.search(r"```(?:\w+)?\s*\n?([\s\S]*?)```", raw)
+        if fence:
+            return fence.group(1).strip()
+        # 2. First JSON object or array found in the text
+        obj = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", raw)
+        if obj:
+            return obj.group(1).strip()
+        # 3. Fallback — return as-is and let json.loads raise a clear error
+        return raw
 
     def get_vision_json_completion(
         self,
@@ -72,11 +92,11 @@ class LLMClient:
             # OpenAI-compatible (Groq, OpenAI, etc.)
             raw = self._openai_vision_completion(b64, mime_type, prompt, system, temperature)
 
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[-1]
-            raw = raw.rsplit("```", 1)[0]
-        return json.loads(raw.strip())
+        raw = self._extract_json_text(raw)
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return json.loads(raw, strict=False)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -128,6 +148,7 @@ class LLMClient:
             model=self.model,
             messages=messages,
             temperature=temperature,
+            max_tokens=4096,
         )
         return response.choices[0].message.content.strip()
 

@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Restaurant, Menu, Dish, Ingredient, DishIngredient, PipelineRun
+from models import Restaurant, Menu, Dish, Ingredient, DishIngredient, PipelineRun, Distributor
 from schemas import (
     PipelineStartRequest, PipelineStartResponse,
     IngredientPriceResult, PricingResponse,
+    DistributorOut, DistributorCoverage, DistributorGap, DistributorSearchResponse,
 )
 from services.pricing import price_ingredient
+from services.distributor_finder import find_distributors_for_run
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 
@@ -181,4 +183,109 @@ def run_pricing(run_id: int, db: Session = Depends(get_db)):
         api_count=api_count,
         llm_count=llm_count,
         cached_count=cached_count,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/pipeline/{run_id}/distributors
+# ---------------------------------------------------------------------------
+
+@router.post("/{run_id}/distributors", response_model=DistributorSearchResponse)
+def run_distributors(run_id: int, db: Session = Depends(get_db)):
+    """
+    Find wholesale distributors for every ingredient in the pipeline run.
+
+    Steps:
+      1. Load all unique ingredients for this run.
+      2. LLM assigns each to a supply category.
+      3. Tavily search per category + restaurant location.
+      4. LLM extracts real distributor data from search results.
+      5. Persist distributors + links; return coverage + gaps.
+
+    Gaps = categories where no real distributor was found. Never fabricated.
+    """
+    run = db.query(PipelineRun).filter(PipelineRun.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Pipeline run not found.")
+
+    restaurant = db.query(Restaurant).filter(Restaurant.id == run.restaurant_id).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found.")
+
+    # Collect unique ingredients for this run
+    dish_ids = [
+        row.id for row in db.query(Dish.id).filter(Dish.menu_id == run.menu_id).all()
+    ]
+    if not dish_ids:
+        raise HTTPException(status_code=422, detail="No dishes found for this run.")
+
+    dis = db.query(DishIngredient).filter(DishIngredient.dish_id.in_(dish_ids)).all()
+    seen_ids: set[int] = set()
+    ingredients: list[Ingredient] = []
+    for di in dis:
+        if di.ingredient_id not in seen_ids:
+            seen_ids.add(di.ingredient_id)
+            ing = db.query(Ingredient).filter(Ingredient.id == di.ingredient_id).first()
+            if ing:
+                ingredients.append(ing)
+
+    if not ingredients:
+        raise HTTPException(status_code=422, detail="No ingredients found for this run.")
+
+    # Run the finder
+    result = find_distributors_for_run(
+        run_id=run_id,
+        menu_ingredients=ingredients,
+        restaurant_city=restaurant.city,
+        restaurant_state=restaurant.state,
+        db=db,
+    )
+
+    # Build response
+    coverage_out: list[DistributorCoverage] = []
+    all_dist_ids: set[int] = set()
+
+    for cov in result["coverage"]:
+        dist_ids   = [d.id for d in cov["all_distributors"] if d]
+        dist_names = [d.name for d in cov["all_distributors"] if d]
+        all_dist_ids.update(dist_ids)
+        coverage_out.append(DistributorCoverage(
+            category=cov["category"],
+            distributor_ids=dist_ids,
+            distributor_names=dist_names,
+            ingredient_ids=cov["ingredient_ids"],
+            ingredient_names=cov["ingredient_names"],
+        ))
+
+    gaps_out: list[DistributorGap] = [
+        DistributorGap(
+            category=g["category"],
+            ingredient_ids=g["ingredient_ids"],
+            ingredient_names=g["ingredient_names"],
+        )
+        for g in result["gaps"]
+    ]
+
+    # Full distributor detail for every found distributor
+    distributors_out = [
+        DistributorOut.model_validate(
+            db.query(Distributor).filter(Distributor.id == did).first()
+        )
+        for did in all_dist_ids
+    ]
+
+    gap_ingredient_count = sum(len(g["ingredient_ids"]) for g in result["gaps"])
+    covered_count        = len(ingredients) - gap_ingredient_count
+
+    run.status = "distributors_found"
+    db.commit()
+
+    return DistributorSearchResponse(
+        run_id=run_id,
+        coverage=coverage_out,
+        gaps=gaps_out,
+        distributors=distributors_out,
+        total_ingredients=len(ingredients),
+        covered_count=covered_count,
+        gap_count=gap_ingredient_count,
     )

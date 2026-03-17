@@ -217,6 +217,34 @@ class PipelineStartResponse(BaseModel):
     menu_id: int
 
 
+# --- Distributor search ---
+
+class DistributorCoverage(BaseModel):
+    """One supply category covered by one or more real distributors."""
+    category: str
+    distributor_ids: list[int]
+    distributor_names: list[str]
+    ingredient_ids: list[int]
+    ingredient_names: list[str]
+
+
+class DistributorGap(BaseModel):
+    """Supply category where Tavily found no usable distributors."""
+    category: str
+    ingredient_ids: list[int]
+    ingredient_names: list[str]
+
+
+class DistributorSearchResponse(BaseModel):
+    run_id: int
+    coverage: list[DistributorCoverage]
+    gaps: list[DistributorGap]
+    distributors: list[DistributorOut]   # full detail on every found distributor
+    total_ingredients: int
+    covered_count: int
+    gap_count: int
+
+
 # --- Pricing result ---
 
 class IngredientPriceResult(BaseModel):
@@ -239,6 +267,25 @@ class PricingResponse(BaseModel):
     api_count: int
     llm_count: int
     cached_count: int
+
+
+# --- Email endpoints ---
+
+class EmailDraftResponse(BaseModel):
+    run_id: int
+    emails: list[RfpEmailOut]
+    total: int
+
+
+class EmailSendRequest(BaseModel):
+    email_ids: Optional[list[int]] = None  # None = send all drafts for the run
+
+
+class EmailSendResponse(BaseModel):
+    run_id: int
+    sent_count: int
+    failed_count: int
+    results: list[dict]  # [{"email_id": int, "sent": bool, "recipient": str}]
 
 
 # --- Pipeline SSE event ---
