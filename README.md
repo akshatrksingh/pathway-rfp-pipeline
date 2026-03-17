@@ -43,8 +43,6 @@ Upload menu
 
 The system automates data gathering — parsing, pricing, distributor search, email drafting. It pauses for human judgment at two points: ingredient review (the chef knows their recipes better than the AI) and email review (nothing goes out without approval).
 
-See [`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md) for detailed architecture notes.
-
 ---
 
 ## Tech stack
