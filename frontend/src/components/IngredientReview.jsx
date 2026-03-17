@@ -242,7 +242,7 @@ function DishCard({ dish, onToggle, onUpdateIngredient, onDeleteIngredient, onUn
   )
 }
 
-export default function IngredientReview({ dishes, setDishes, onConfirm }) {
+export default function IngredientReview({ dishes, setDishes, onConfirm, isConfirming = false, confirmError = null }) {
   function toggleDish(dishId) {
     setDishes(prev => prev.map(d =>
       d.id === dishId ? { ...d, isExpanded: !d.isExpanded } : d
@@ -346,20 +346,21 @@ export default function IngredientReview({ dishes, setDishes, onConfirm }) {
 
         <button
           onClick={onConfirm}
+          disabled={isConfirming}
           style={{
-            background: 'var(--green-strong)',
+            background: isConfirming ? 'var(--text-hint)' : 'var(--green-strong)',
             color: '#FFFFFF',
             border: 'none',
             borderRadius: 'var(--radius-pill)',
             padding: '10px 24px',
             fontSize: 14,
             fontWeight: 500,
-            cursor: 'pointer',
+            cursor: isConfirming ? 'not-allowed' : 'pointer',
             whiteSpace: 'nowrap',
             flexShrink: 0,
           }}
         >
-          Confirm & run pipeline
+          {isConfirming ? 'Saving…' : 'Confirm & run pipeline'}
         </button>
       </div>
 
@@ -392,24 +393,40 @@ export default function IngredientReview({ dishes, setDishes, onConfirm }) {
         />
       ))}
 
+      {/* Confirm error */}
+      {confirmError && (
+        <div style={{
+          background: 'var(--red-light)',
+          border: '0.5px solid var(--red-strong)',
+          borderRadius: 'var(--radius-md)',
+          padding: '10px 14px',
+          fontSize: 13,
+          color: 'var(--red-text)',
+          marginBottom: 16,
+        }}>
+          {confirmError}
+        </div>
+      )}
+
       {/* Bottom CTA */}
-      <div style={{ paddingTop: 12, paddingBottom: 32 }}>
+      <div style={{ paddingTop: 4, paddingBottom: 32, display: 'flex', alignItems: 'center', gap: 14 }}>
         <button
           onClick={onConfirm}
+          disabled={isConfirming}
           style={{
-            background: 'var(--green-strong)',
+            background: isConfirming ? 'var(--text-hint)' : 'var(--green-strong)',
             color: '#FFFFFF',
             border: 'none',
             borderRadius: 'var(--radius-pill)',
             padding: '11px 32px',
             fontSize: 14,
             fontWeight: 500,
-            cursor: 'pointer',
+            cursor: isConfirming ? 'not-allowed' : 'pointer',
           }}
         >
-          Confirm & run pipeline
+          {isConfirming ? 'Saving…' : 'Confirm & run pipeline'}
         </button>
-        <span style={{ fontSize: 13, color: 'var(--text-hint)', marginLeft: 14 }}>
+        <span style={{ fontSize: 13, color: 'var(--text-hint)' }}>
           Nothing is saved until you confirm.
         </span>
       </div>

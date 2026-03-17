@@ -1,5 +1,9 @@
 import { useState, useRef } from 'react'
 
+const ACCEPTED_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'])
+const ACCEPTED_EXTS  = new Set(['.pdf', '.png', '.jpg', '.jpeg', '.webp'])
+const MAX_BYTES      = 10 * 1024 * 1024
+
 const labelStyle = {
   display: 'block',
   fontSize: 12,
@@ -25,30 +29,62 @@ function FocusInput({ style, ...props }) {
   return (
     <input
       {...props}
-      style={{
-        ...inputStyle,
-        ...style,
-        borderColor: focused ? '#888780' : 'var(--border-default)',
-      }}
+      style={{ ...inputStyle, ...style, borderColor: focused ? '#888780' : 'var(--border-default)' }}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
     />
   )
 }
 
+function FileIcon({ isPdf }) {
+  if (isPdf) {
+    return (
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{ margin: '0 auto', display: 'block' }}>
+        <rect x="6" y="2" width="20" height="28" rx="2" fill="#E1F5EE" stroke="var(--green-medium)" strokeWidth="1"/>
+        <path d="M10 10h12M10 15h12M10 20h8" stroke="var(--green-strong)" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    )
+  }
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{ margin: '0 auto', display: 'block' }}>
+      <rect x="4" y="4" width="24" height="24" rx="3" fill="#E1F5EE" stroke="var(--green-medium)" strokeWidth="1"/>
+      <circle cx="11" cy="12" r="2.5" fill="var(--green-medium)"/>
+      <path d="M4 22l7-7 5 5 4-4 8 8" stroke="var(--green-strong)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+function validateFile(file) {
+  const ext = '.' + (file.name || '').split('.').pop().toLowerCase()
+  const type = (file.type || '').toLowerCase()
+
+  if (!ACCEPTED_TYPES.has(type) && !ACCEPTED_EXTS.has(ext)) {
+    return 'Please upload a PDF or image file (PNG, JPG, JPEG).'
+  }
+  if (file.size > MAX_BYTES) {
+    return `File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Please upload a file under 10 MB.`
+  }
+  return null
+}
+
 export default function MenuUpload({
   restForm, setRestForm, selectedRestaurant, isParsing, parseError, onParse,
 }) {
-  const [pdfFile, setPdfFile] = useState(null)
-  const [menuUrl, setMenuUrl] = useState('')
+  const [file, setFile]           = useState(null)
+  const [fileError, setFileError] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
-  const fileInputRef = useRef(null)
+  const inputRef = useRef(null)
 
-  function handleFile(file) {
-    if (file?.type === 'application/pdf') {
-      setPdfFile(file)
-      setMenuUrl('')
+  function handleFile(f) {
+    if (!f) return
+    const err = validateFile(f)
+    if (err) {
+      setFileError(err)
+      setFile(null)
+      return
     }
+    setFileError(null)
+    setFile(f)
   }
 
   function handleDrop(e) {
@@ -59,16 +95,16 @@ export default function MenuUpload({
 
   function handleSubmit(e) {
     e.preventDefault()
-    if (!pdfFile && !menuUrl.trim()) return
-    onParse({ file: pdfFile || null, url: menuUrl.trim() || null })
+    if (!file) return
+    onParse({ file })
   }
 
-  const hasSource = pdfFile || menuUrl.trim()
-  const hasRestaurant = selectedRestaurant || restForm.name.trim()
-  const isReady = hasSource && hasRestaurant && !isParsing
+  const isPdf = file?.type === 'application/pdf' || file?.name?.endsWith('.pdf')
+  const isReady = file && (selectedRestaurant || restForm.name.trim()) && !isParsing
+  const anyError = fileError || parseError
 
   return (
-    <div style={{ maxWidth: 580 }}>
+    <div style={{ maxWidth: 560 }}>
       <h1 style={{
         fontFamily: 'var(--font-serif)',
         fontSize: 22,
@@ -82,11 +118,11 @@ export default function MenuUpload({
           : 'Set up a new restaurant'}
       </h1>
       <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 28 }}>
-        Upload a PDF menu or paste a URL — we'll extract dishes and ingredients automatically.
+        Upload a PDF or image of your menu — we'll extract dishes and ingredients automatically.
       </p>
 
       <form onSubmit={handleSubmit}>
-        {/* Restaurant details — only for new restaurants */}
+        {/* Restaurant fields — new only */}
         {!selectedRestaurant && (
           <div style={{ marginBottom: 28 }}>
             <div style={{ marginBottom: 12 }}>
@@ -127,63 +163,53 @@ export default function MenuUpload({
           </div>
         )}
 
-        {/* PDF drop zone */}
+        {/* Drop zone */}
         <div
           onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
-          onClick={() => !pdfFile && fileInputRef.current?.click()}
+          onClick={() => !file && inputRef.current?.click()}
           style={{
-            border: `1.5px dashed ${isDragging ? 'var(--green-strong)' : pdfFile ? 'var(--green-medium)' : 'var(--border-default)'}`,
+            border: `1.5px dashed ${
+              anyError     ? 'var(--red-strong)'   :
+              isDragging   ? 'var(--green-strong)' :
+              file         ? 'var(--green-medium)' :
+                             'var(--border-default)'
+            }`,
             borderRadius: 'var(--radius-lg)',
             padding: '28px 24px',
             textAlign: 'center',
-            background: isDragging ? 'var(--green-light)' : pdfFile ? '#F5FCF9' : 'var(--bg-card)',
-            cursor: pdfFile ? 'default' : 'pointer',
+            background: anyError ? 'var(--red-light)' : isDragging ? 'var(--green-light)' : file ? '#F5FCF9' : 'var(--bg-card)',
+            cursor: file ? 'default' : 'pointer',
             transition: 'all 0.15s',
-            marginBottom: 14,
+            marginBottom: anyError ? 10 : 28,
           }}
         >
           <input
-            ref={fileInputRef}
+            ref={inputRef}
             type="file"
-            accept=".pdf"
+            accept=".pdf,.png,.jpg,.jpeg,.webp"
             style={{ display: 'none' }}
             onChange={e => handleFile(e.target.files[0])}
           />
 
-          {pdfFile ? (
+          {file ? (
             <div>
-              {/* PDF icon */}
-              <div style={{ marginBottom: 8 }}>
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{ margin: '0 auto', display: 'block' }}>
-                  <rect x="6" y="2" width="20" height="28" rx="2" fill="#E1F5EE" stroke="var(--green-medium)" strokeWidth="1"/>
-                  <path d="M10 10h12M10 15h12M10 20h8" stroke="var(--green-strong)" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{pdfFile.name}</div>
+              <div style={{ marginBottom: 8 }}><FileIcon isPdf={isPdf} /></div>
+              <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{file.name}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                {(pdfFile.size / 1024).toFixed(0)} KB
+                {(file.size / 1024).toFixed(0)} KB · {isPdf ? 'PDF' : 'Image'}
               </div>
               <button
                 type="button"
-                onClick={e => { e.stopPropagation(); setPdfFile(null) }}
-                style={{
-                  marginTop: 8,
-                  fontSize: 12,
-                  color: 'var(--text-muted)',
-                  background: 'none',
-                  border: 'none',
-                  textDecoration: 'underline',
-                  padding: 0,
-                }}
+                onClick={e => { e.stopPropagation(); setFile(null); setFileError(null) }}
+                style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)', background: 'none', border: 'none', textDecoration: 'underline', padding: 0, cursor: 'pointer' }}
               >
                 Remove
               </button>
             </div>
           ) : (
             <div>
-              {/* Upload icon */}
               <div style={{ marginBottom: 10 }}>
                 <svg width="28" height="28" viewBox="0 0 28 28" fill="none" style={{ margin: '0 auto', display: 'block' }}>
                   <path d="M14 18V8M14 8L10 12M14 8L18 12" stroke="var(--text-hint)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -191,36 +217,18 @@ export default function MenuUpload({
                 </svg>
               </div>
               <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-                Drop PDF here or{' '}
-                <span style={{ color: 'var(--green-strong)', textDecoration: 'underline' }}>
-                  click to browse
-                </span>
+                Drop file here or{' '}
+                <span style={{ color: 'var(--green-strong)', textDecoration: 'underline' }}>browse</span>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-hint)', marginTop: 4 }}>PDF only</div>
+              <div style={{ fontSize: 12, color: 'var(--text-hint)', marginTop: 5 }}>
+                PDF · PNG · JPG · JPEG &nbsp;·&nbsp; Max 10 MB
+              </div>
             </div>
           )}
         </div>
 
-        {/* OR divider */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-          <div style={{ flex: 1, height: '0.5px', background: 'var(--border-default)' }} />
-          <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>or paste a URL</span>
-          <div style={{ flex: 1, height: '0.5px', background: 'var(--border-default)' }} />
-        </div>
-
-        {/* URL input */}
-        <div style={{ marginBottom: 28 }}>
-          <FocusInput
-            placeholder="https://restaurant.com/menu"
-            value={menuUrl}
-            disabled={!!pdfFile}
-            onChange={e => setMenuUrl(e.target.value)}
-            style={{ opacity: pdfFile ? 0.4 : 1 }}
-          />
-        </div>
-
-        {/* Error */}
-        {parseError && (
+        {/* Error message */}
+        {anyError && (
           <div style={{
             background: 'var(--red-light)',
             border: '0.5px solid var(--red-strong)',
@@ -228,9 +236,9 @@ export default function MenuUpload({
             padding: '10px 14px',
             fontSize: 13,
             color: 'var(--red-text)',
-            marginBottom: 16,
+            marginBottom: 20,
           }}>
-            {parseError}
+            {anyError}
           </div>
         )}
 
@@ -239,7 +247,7 @@ export default function MenuUpload({
           disabled={!isReady}
           style={{
             background: isReady ? 'var(--green-strong)' : 'var(--text-hint)',
-            color: '#FFFFFF',
+            color: '#fff',
             border: 'none',
             borderRadius: 'var(--radius-pill)',
             padding: '10px 28px',
@@ -262,9 +270,7 @@ export default function MenuUpload({
         </button>
       </form>
 
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

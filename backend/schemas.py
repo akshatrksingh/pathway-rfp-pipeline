@@ -187,6 +187,60 @@ class ParsedMenu(BaseModel):
     dishes: list[ParsedDish]
 
 
+# --- Pipeline start (confirm + persist) ---
+
+class ConfirmIngredient(BaseModel):
+    name: str
+    quantity: Optional[float] = None
+    unit: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class ConfirmDish(BaseModel):
+    name: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    ingredients: list[ConfirmIngredient]
+
+
+class PipelineStartRequest(BaseModel):
+    restaurant_name: str
+    restaurant_address: str = ""
+    restaurant_city: str = ""
+    restaurant_state: str = ""
+    dishes: list[ConfirmDish]
+
+
+class PipelineStartResponse(BaseModel):
+    run_id: int
+    restaurant_id: int
+    menu_id: int
+
+
+# --- Pricing result ---
+
+class IngredientPriceResult(BaseModel):
+    ingredient_id: int
+    ingredient_name: str
+    fdc_id: Optional[int] = None
+    usda_category: Optional[str] = None
+    price_low: Optional[float] = None
+    price_avg: Optional[float] = None
+    price_high: Optional[float] = None
+    unit: Optional[str] = None
+    source: str
+    confidence: str
+
+
+class PricingResponse(BaseModel):
+    run_id: int
+    results: list[IngredientPriceResult]
+    total: int
+    api_count: int
+    llm_count: int
+    cached_count: int
+
+
 # --- Pipeline SSE event ---
 
 class PipelineEvent(BaseModel):
