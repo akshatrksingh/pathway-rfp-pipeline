@@ -1,5 +1,5 @@
 from pathlib import Path
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 from config import get_settings
@@ -20,10 +20,18 @@ def _resolve_db_url(url: str) -> str:
 
 _db_url = _resolve_db_url(settings.database_url)
 
+_is_sqlite = _db_url.startswith("sqlite")
+
 engine = create_engine(
     _db_url,
-    connect_args={"check_same_thread": False} if _db_url.startswith("sqlite") else {},
+    connect_args={"check_same_thread": False, "timeout": 30} if _is_sqlite else {},
 )
+
+if _is_sqlite:
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragmas(dbapi_conn, _):
+        dbapi_conn.execute("PRAGMA journal_mode=WAL")
+        dbapi_conn.execute("PRAGMA synchronous=NORMAL")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

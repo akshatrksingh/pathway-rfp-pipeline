@@ -8,7 +8,7 @@ router = APIRouter(prefix="/api/menus", tags=["menus"])
 
 _ALLOWED_MIME = {"application/pdf", "image/png", "image/jpeg", "image/jpg", "image/webp"}
 _ALLOWED_EXT  = {".pdf", ".png", ".jpg", ".jpeg", ".webp"}
-_MAX_BYTES     = 10 * 1024 * 1024  # 10 MB
+_MAX_BYTES     = 30 * 1024 * 1024  # 30 MB
 
 
 def _resolve_content_type(file: UploadFile) -> str:

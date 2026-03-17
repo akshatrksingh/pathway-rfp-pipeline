@@ -122,6 +122,10 @@ def run_pricing(run_id: int, db: Session = Depends(get_db)):
     if not run:
         raise HTTPException(status_code=404, detail="Pipeline run not found.")
 
+    restaurant = db.query(Restaurant).filter(Restaurant.id == run.restaurant_id).first()
+    city  = restaurant.city  if restaurant else ""
+    state = restaurant.state if restaurant else ""
+
     # Collect unique ingredients (ingredient_id → representative unit)
     dish_ids = [
         row.id
@@ -151,14 +155,14 @@ def run_pricing(run_id: int, db: Session = Depends(get_db)):
         if not ingredient:
             continue
 
-        pd, origin = price_ingredient(db, ingredient, unit)
+        pd, origin = price_ingredient(db, ingredient, unit, city=city, state=state)
 
         if origin == "cached":
             cached_count += 1
         elif origin == "llm_estimate":
             llm_count += 1
         else:
-            api_count += 1
+            api_count += 1  # tavily or any future real API
 
         results.append(IngredientPriceResult(
             ingredient_id=ing_id,

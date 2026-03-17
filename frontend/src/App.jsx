@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar'
 import MenuUpload from './components/MenuUpload'
 import DishServings from './components/DishServings'
 import IngredientReview from './components/IngredientReview'
+import PipelineProgress from './components/PipelineProgress'
 
 const MOCK_RESTAURANTS = [
   { id: 1, name: "Luca's Trattoria", address: '123 Main St', city: 'Brooklyn', state: 'NY' },
@@ -222,17 +223,7 @@ export default function App() {
           )}
 
           {view === 'pipeline' && (
-            <div style={{ paddingTop: 60, textAlign: 'center' }}>
-              <div style={{ fontFamily: 'var(--font-serif)', fontSize: 20, color: 'var(--text-primary)', marginBottom: 8 }}>
-                Pipeline started
-              </div>
-              <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 4 }}>
-                Run #{runId} · ingredients confirmed and saved.
-              </p>
-              <p style={{ fontSize: 13, color: 'var(--text-hint)' }}>
-                Pricing, distributor search, and email steps coming next.
-              </p>
-            </div>
+            <PipelineProgress runId={runId} />
           )}
         </main>
       </div>

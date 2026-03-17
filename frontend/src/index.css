@@ -87,3 +87,22 @@ input[type=number]::-webkit-outer-spin-button {
   background: var(--border-default);
   border-radius: 3px;
 }
+
+@keyframes progress-sweep {
+  0%   { width: 10%; }
+  60%  { width: 72%; }
+  100% { width: 82%; }
+}
+
+@keyframes pulse-opacity {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+.progress-sweep {
+  animation: progress-sweep 3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.pulse {
+  animation: pulse-opacity 1.6s ease-in-out infinite;
+}

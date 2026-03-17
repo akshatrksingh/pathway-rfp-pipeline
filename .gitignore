@@ -6,3 +6,6 @@ node_modules/
 dist/
 .venv/
 pathway-rfp-pipeline-venv/
+.DS_Store
+*.db-shm
+*.db-wal
